@@ -7,6 +7,7 @@ import {
   XCircle, Loader2, Award
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { insertCertificate } from "@/lib/supabase-db";
 
 export default function CertificateValidatorPage() {
   const [certId, setCertId] = useState("");
@@ -30,14 +31,35 @@ export default function CertificateValidatorPage() {
           status: "invalid",
           message: "Certificate not found in the verified registry.",
         });
+        // Save invalid attempt to Supabase
+        insertCertificate({
+          user_name: user?.name || 'Guest',
+          cert_name: certId,
+          issuer: 'Unknown',
+          course: 'Unknown',
+          issue_date: new Date().toISOString(),
+          is_valid: false,
+          flag_reason: 'Not found in registry',
+        });
       } else {
-        setResult({
+        const validResult = {
           status: "valid",
           issuer: "PrepIQ Masterclass",
           recipient: user?.name || "John Doe",
           course: "Advanced Data Structures & Algorithms",
           date: "April 15, 2024",
           hash: "0x8f" + Math.random().toString(16).slice(2, 10) + "...e2",
+        };
+        setResult(validResult);
+        // Save to Supabase
+        insertCertificate({
+          user_name: user?.name || 'Guest',
+          cert_name: certId,
+          issuer: validResult.issuer,
+          course: validResult.course,
+          issue_date: validResult.date,
+          is_valid: true,
+          hash_signature: validResult.hash,
         });
       }
     }, 2000);
@@ -63,13 +85,24 @@ export default function CertificateValidatorPage() {
       const date = new Date(file.lastModified).toLocaleDateString("en-US", { year: 'numeric', month: 'long', day: 'numeric' });
       
       setCertId(file.name);
-      setResult({
+      const uploadResult = {
         status: "valid",
         issuer: issuer,
         recipient: user?.name || "John Doe",
         course: course.length > 3 ? course : "Advanced Technical Certification",
         date: date,
         hash: "0x" + Math.random().toString(16).slice(2, 12) + "..." + Math.random().toString(16).slice(2, 6)
+      };
+      setResult(uploadResult);
+      // Save uploaded cert to Supabase
+      insertCertificate({
+        user_name: user?.name || 'Guest',
+        cert_name: file.name,
+        issuer: uploadResult.issuer,
+        course: uploadResult.course,
+        issue_date: uploadResult.date,
+        is_valid: true,
+        hash_signature: uploadResult.hash,
       });
     }, 2500);
   };

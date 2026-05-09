@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { DEMO_USER } from "./demo-data";
+import { insertLoginActivity } from "./supabase-db";
 
 interface User {
   id: string;
@@ -35,6 +36,7 @@ const AuthContext = createContext<AuthContextType>({
   isDemo: false,
   login: async () => {},
   loginDemo: () => {},
+  signup: async () => {},
   logout: async () => {},
   googleLoginLocal: async () => {},
   faceLoginLocal: async () => {},
@@ -88,6 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const found = users.find((u: any) => u.email === email && u.password === password);
     if (!found) throw new Error("Invalid credentials");
     saveSession(found);
+    // Log to Supabase
+    insertLoginActivity({ user_name: found.name, user_email: found.email, login_status: 'success' });
   };
 
   const loginDemo = () => {
@@ -114,6 +118,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     users.push(newUser);
     saveLocalUsers(users);
     saveSession(newUser);
+    // Log signup to Supabase
+    insertLoginActivity({ user_name: newUser.name, user_email: newUser.email!, login_status: 'signup' });
   };
 
   const googleLoginLocal = async (email: string) => {
@@ -135,6 +141,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       saveLocalUsers(users);
     }
     saveSession(found);
+    // Log Google login to Supabase
+    insertLoginActivity({ user_name: found.name, user_email: found.email, login_status: 'google_login' });
   };
 
   const faceLoginLocal = async (faceId: string) => {
@@ -157,6 +165,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       saveLocalUsers(users);
     }
     saveSession(found);
+    // Log face login to Supabase
+    insertLoginActivity({ user_name: found.name, user_email: found.email, login_status: 'face_login' });
   };
 
   const logout = async () => {

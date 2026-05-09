@@ -8,8 +8,12 @@ import {
 } from "lucide-react";
 import { DEMO_USER } from "@/lib/demo-data";
 import toast from "react-hot-toast";
+import { useAuth } from "@/lib/auth-context";
+import { upsertUserProfile } from "@/lib/supabase-db";
 
 export default function SettingsPage() {
+  const { user } = useAuth();
+  const currentUser = user || DEMO_USER;
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [deleteModal, setDeleteModal] = useState(false);
   const [profile, setProfile] = useState({
@@ -62,7 +66,21 @@ export default function SettingsPage() {
             </div>
           ))}
         </div>
-        <button onClick={() => toast.success("Profile saved!")} className="btn-primary mt-4">
+        <button onClick={() => {
+          // Save to Supabase
+          upsertUserProfile({
+            user_name: profile.name,
+            email: profile.email,
+            college: profile.college,
+            branch: profile.branch,
+            year: profile.year,
+            city: profile.city,
+            career_goal: profile.career_goal,
+            target_company_type: profile.target_company_type,
+            placement_timeline: profile.placement_timeline,
+          });
+          toast.success("Profile saved!");
+        }} className="btn-primary mt-4">
           <Save size={14} />Save Profile
         </button>
       </motion.div>

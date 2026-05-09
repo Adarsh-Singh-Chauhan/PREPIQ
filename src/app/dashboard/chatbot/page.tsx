@@ -2,15 +2,20 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Sparkles, Bot, ChevronDown, User, StopCircle, Loader2 } from "lucide-react";
+import { Send, Sparkles, Bot, ChevronDown, User, StopCircle, Loader2, FileText, UploadCloud, CheckCircle } from "lucide-react";
 import { DEMO_CHAT_HISTORY } from "@/lib/demo-data";
 import { generateAIResponse } from "@/lib/gemini";
+import { parseResumeText, buildRAGContext, type ResumeData } from "@/lib/rag-engine";
+import { insertChatMessage } from "@/lib/supabase-db";
+import { useAuth } from "@/lib/auth-context";
 
 const suggestions = [
   { icon: "🎯", text: "Ask me a DSA interview question" },
   { icon: "📊", text: "What are my weak areas?" },
   { icon: "🗺️", text: "Help me plan my study schedule" },
   { icon: "💡", text: "Give me tips for HR interviews" },
+  { icon: "🧠", text: "Ask me a Machine Learning question" },
+  { icon: "🤖", text: "Ask me a Deep Learning question" },
   { icon: "🐍", text: "Ask me a Python question" },
   { icon: "☕", text: "Ask me a Java question" },
 ];
@@ -31,12 +36,29 @@ If asked to give an interview question, give exactly ONE question and explain wh
 If asked to evaluate an answer, give a score out of 100 and specific actionable feedback.`;
 
 export default function ChatbotPage() {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMsg[]>(DEMO_CHAT_HISTORY);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [selectedModel, setSelectedModel] = useState("ChatGPT 5.1 Omni");
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [resumeData, setResumeData] = useState<ResumeData | null>(null);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const resumeRef = useRef<HTMLInputElement>(null);
+
+  const handleResumeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setResumeFile(file);
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const text = ev.target?.result as string || '';
+        setResumeData(parseResumeText(text));
+      };
+      reader.readAsText(file);
+    }
+  };
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -50,6 +72,10 @@ export default function ChatbotPage() {
     setInput("");
     setIsTyping(true);
 
+    // Save user message to Supabase
+    const userName = user?.name || 'Guest';
+    insertChatMessage({ user_name: userName, role: 'user', message: text });
+
     try {
       // Build context from recent messages
       const recentMessages = messages.slice(-6).map(m => 
@@ -58,10 +84,13 @@ export default function ChatbotPage() {
 
       const prompt = `${SYSTEM_CONTEXT}\n\nCurrent Model Personality: ${selectedModel}\n\nRecent conversation:\n${recentMessages}\n\nStudent: ${text}\n\nSage:`;
       
-      const reply = await generateAIResponse(prompt);
+      const ragCtx = resumeData ? buildRAGContext(resumeData, 'general') : '';
+      const reply = await generateAIResponse(prompt, { resumeContext: ragCtx });
       
       setIsTyping(false);
       setMessages((prev) => [...prev, { role: "assistant", message: reply, timestamp: now }]);
+      // Save AI response to Supabase
+      insertChatMessage({ user_name: userName, role: 'assistant', message: reply });
     } catch (error) {
       setIsTyping(false);
       setMessages((prev) => [...prev, { 
@@ -198,12 +227,23 @@ export default function ChatbotPage() {
           <motion.div 
             className="relative flex items-end gap-2 p-2 rounded-3xl bg-surface/80 backdrop-blur-xl border border-white/10 shadow-[0_0_30px_rgba(139,92,246,0.1)] focus-within:shadow-[0_0_40px_rgba(139,92,246,0.2)] focus-within:border-accent/50 transition-all"
           >
-            <div className="flex-1 min-h-[56px] flex items-center px-4">
+            <input type="file" accept=".pdf,.doc,.docx,.txt" className="hidden" ref={resumeRef} onChange={handleResumeUpload} />
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => resumeRef.current?.click()}
+              className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${resumeFile ? 'bg-success/20 text-success' : 'bg-white/5 text-text-secondary hover:text-accent'}`}
+              title={resumeFile ? `Resume loaded: ${resumeFile.name}` : 'Upload resume for RAG context'}
+            >
+              {resumeFile ? <CheckCircle size={18} /> : <UploadCloud size={18} />}
+            </motion.button>
+            
+            <div className="flex-1 min-h-[56px] flex items-center px-2">
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && sendMessage(input)}
-                placeholder="Ask Sage anything... (Try 'Give me a DSA question')"
+                placeholder={resumeData ? "Ask Sage (RAG-enhanced with your resume)..." : "Ask Sage anything..."}
                 disabled={isTyping}
                 className="w-full bg-transparent border-none outline-none text-text-primary placeholder:text-text-secondary/50 disabled:opacity-50"
               />
@@ -223,7 +263,7 @@ export default function ChatbotPage() {
           </motion.div>
           
           <div className="text-center text-[11px] text-text-secondary/50">
-            PrepIQ AI is powered by OpenAI and Google Gemini. It can make mistakes — verify critical interview information.
+            {resumeData ? `🧠 RAG Active — ${resumeData.skills.length} skills from resume • ` : ''}PrepIQ AI is powered by LLM + RAG. It can make mistakes — verify critical information.
           </div>
         </div>
       </div>

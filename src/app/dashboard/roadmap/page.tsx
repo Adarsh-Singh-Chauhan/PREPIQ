@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Target, Edit3, CheckCircle2, Lock, ChevronDown, ChevronUp,
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { DEMO_USER, DEMO_ROADMAP, DEMO_SKILLS } from "@/lib/demo-data";
 import { useAuth } from "@/lib/auth-context";
+import { insertRoadmapMilestone, getRoadmapMilestones } from "@/lib/supabase-db";
 
 const statusConfig: Record<string, { badge: string; label: string }> = {
   completed: { badge: "badge-success", label: "Completed" },
@@ -46,6 +47,52 @@ export default function RoadmapPage() {
     timeline: currentUser.placement_timeline || "6 months"
   });
 
+  // Sync with Supabase on mount
+  
+  useEffect(() => {
+    if (!isDemo && currentUser?.name) {
+      getRoadmapMilestones(currentUser.name).then(res => {
+        if (res.success && res.data.length > 0) {
+          setMilestones((prev: any) => {
+            const updated = JSON.parse(JSON.stringify(prev)); // Deep copy
+            res.data.forEach((dbM: any) => {
+               const phase = updated.find((p: any) => p.phase === dbM.phase_number);
+               if (phase) {
+                  const m = phase.milestones.find((m: any) => m.text === dbM.milestone_text);
+                  if (m) {
+                     m.completed = dbM.is_completed;
+                  }
+               }
+            });
+            
+            // Recalculate progress
+            updated.forEach((phase: any) => {
+               const done = phase.milestones.filter((m: any) => m.completed).length;
+               phase.progress = Math.round((done / phase.milestones.length) * 100);
+            });
+            
+            // Recalculate locks
+            updated.forEach((phase: any, i: number) => {
+               if (phase.progress === 100) {
+                  phase.status = "completed";
+               } else if (phase.progress > 0 || (i === 0) || (i > 0 && updated[i-1].progress === 100)) {
+                  phase.status = "in_progress";
+               } else {
+                  phase.status = "locked";
+               }
+            });
+            
+            // Also update local storage so it stays fast on next load
+            if (typeof window !== "undefined") {
+              localStorage.setItem(`roadmap_${currentUser.id}`, JSON.stringify(updated));
+            }
+            return updated;
+          });
+        }
+      });
+    }
+  }, [currentUser?.name, isDemo, currentUser?.id]);
+
   const saveRoadmap = (newRoadmap: any) => {
     setMilestones(newRoadmap);
     if (!isDemo && typeof window !== "undefined") {
@@ -69,6 +116,18 @@ export default function RoadmapPage() {
     });
 
     saveRoadmap(updatedRoadmap);
+
+    // Save milestone state to Supabase
+    const phase = updatedRoadmap[pi];
+    const milestone = phase.milestones.find((m: any) => m.id === mid);
+    if (milestone) {
+      insertRoadmapMilestone({
+        user_name: currentUser.name,
+        phase_number: phase.phase,
+        milestone_text: milestone.text,
+        is_completed: milestone.completed,
+      });
+    }
   };
 
   const regenerateRoadmap = () => {

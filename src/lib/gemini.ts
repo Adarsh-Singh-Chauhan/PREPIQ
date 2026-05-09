@@ -1,10 +1,17 @@
-// Gemini AI client — calls our own API route to avoid needing @google/generative-ai SDK
-export const generateAIResponse = async (prompt: string): Promise<string> => {
+// Gemini AI client with RAG support
+export const generateAIResponse = async (
+  prompt: string,
+  options?: { resumeContext?: string; mode?: string }
+): Promise<string> => {
   try {
     const response = await fetch('/api/gemini', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({
+        prompt,
+        resumeContext: options?.resumeContext || '',
+        mode: options?.mode || '',
+      }),
     });
 
     if (!response.ok) {
@@ -15,6 +22,6 @@ export const generateAIResponse = async (prompt: string): Promise<string> => {
     return data.text || 'No response generated.';
   } catch (error) {
     console.error('Error generating AI response:', error);
-    return "Sorry, I'm having trouble connecting to my brain right now. Please try again.";
+    return "Sorry, I'm having trouble connecting right now. Please try again.";
   }
 };

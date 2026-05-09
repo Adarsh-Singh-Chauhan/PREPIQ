@@ -6,6 +6,8 @@ import { Calendar } from "lucide-react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { DEMO_SCHEDULE } from "@/lib/demo-data";
+import { useAuth } from "@/lib/auth-context";
+import { insertScheduleSlot } from "@/lib/supabase-db";
 
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const hours = Array.from({ length: 16 }, (_, i) => i + 7);
@@ -90,13 +92,29 @@ const DayColumn = ({ day, daySlots, moveSlot }: any) => {
 };
 
 export default function SchedulePage() {
+  const { user } = useAuth();
   const [schedule, setSchedule] = useState(
     DEMO_SCHEDULE.map((s, i) => ({ ...s, id: i }))
   );
 
   const moveSlot = useCallback((id: number, newDay: string) => {
-    setSchedule((prev) => prev.map((s) => (s.id === id ? { ...s, day: newDay } : s)));
-  }, []);
+    setSchedule((prev) => {
+      const updated = prev.map((s) => (s.id === id ? { ...s, day: newDay } : s));
+      // Track schedule change in Supabase
+      const movedSlot = updated.find(s => s.id === id);
+      if (movedSlot) {
+        insertScheduleSlot({
+          user_name: user?.name || 'Guest',
+          day_of_week: newDay,
+          start_time: movedSlot.start,
+          end_time: movedSlot.end,
+          topic: movedSlot.topic,
+          color: movedSlot.color,
+        });
+      }
+      return updated;
+    });
+  }, [user]);
 
   return (
     <DndProvider backend={HTML5Backend}>

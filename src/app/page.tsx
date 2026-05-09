@@ -19,12 +19,13 @@ import {
   Zap,
   Users,
   Award,
+  type LucideIcon,
 } from "lucide-react";
 import { FEATURE_CARDS } from "@/lib/demo-data";
 import { ThemeProvider } from "@/lib/theme-context";
 import { AuthProvider } from "@/lib/auth-context";
 
-const iconMap: Record<string, React.ComponentType<{ className?: string; size?: number }>> = {
+const iconMap: Record<string, LucideIcon> = {
   Brain,
   Target,
   BarChart3,

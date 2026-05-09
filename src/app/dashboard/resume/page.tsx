@@ -3,8 +3,11 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, UploadCloud, CheckCircle, AlertCircle, FileUp, Sparkles, Target, Zap, ChevronRight, BarChart } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { insertResumeCheck } from "@/lib/supabase-db";
 
 export default function ResumeCheckerPage() {
+  const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
@@ -49,7 +52,7 @@ export default function ResumeCheckerPage() {
           ];
           const randomSuggestions = possibleSuggestions.sort(() => 0.5 - Math.random()).slice(0, 3);
 
-          setResults({
+          const newResults = {
             score: randomScore,
             status: randomScore > 80 ? "Great" : "Good",
             sections: [
@@ -59,7 +62,17 @@ export default function ResumeCheckerPage() {
             ],
             missingKeywords: missingKw,
             suggestions: randomSuggestions
-          });
+          };
+          setResults(newResults);
+          
+          if (user) {
+            insertResumeCheck({
+              user_name: user.name,
+              score: randomScore,
+              status: randomScore > 80 ? "Great" : "Good",
+              feedback: randomSuggestions.join(" | ")
+            });
+          }
         }, 500);
       }
       setScanProgress(progress);
