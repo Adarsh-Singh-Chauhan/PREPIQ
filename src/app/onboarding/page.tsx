@@ -28,7 +28,7 @@ const timeSlots = ["9am", "10am", "11am", "12pm", "1pm", "2pm", "3pm", "4pm", "5
 
 function OnboardingContent() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth() as any;
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
     name: "", college: "", branch: "", year: "", city: "",
@@ -137,6 +137,18 @@ function OnboardingContent() {
         });
       });
     }
+
+    // Update the auth session with onboarding data
+    updateUser({
+      name: form.name || user?.name || 'Guest',
+      college: form.college,
+      branch: form.branch,
+      year: form.year,
+      city: form.city,
+      career_goal: form.career_goal,
+      target_company_type: form.company_type,
+      placement_timeline: form.timeline,
+    });
 
     toast.success("Profile complete! Generating your roadmap...");
     setTimeout(() => router.push("/dashboard"), 1500);

@@ -29,6 +29,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   googleLoginLocal: (email: string) => Promise<void>;
   faceLoginLocal: (faceId: string) => Promise<void>;
+  updateUser: (data: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -40,6 +41,7 @@ const AuthContext = createContext<AuthContextType>({
   logout: async () => {},
   googleLoginLocal: async () => {},
   faceLoginLocal: async () => {},
+  updateUser: () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -104,10 +106,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("User already exists");
     }
     const newUser = {
-      ...DEMO_USER,
       id: "usr_" + Math.random().toString(36).substring(2, 9),
       name: data.name || "User",
       email: data.email!,
+      college: "",
+      branch: "",
+      year: "",
+      city: "",
+      career_goal: "",
+      target_company_type: "",
+      placement_timeline: "",
+      avatar: null,
       password: data.password, // storing password locally for simulation
       created_at: new Date().toISOString(),
       streak: 0,
@@ -127,10 +136,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let found = users.find((u: any) => u.email === email);
     if (!found) {
       found = {
-        ...DEMO_USER,
         id: "usr_" + Math.random().toString(36).substring(2, 9),
         name: email.split("@")[0],
         email: email,
+        college: "",
+        branch: "",
+        year: "",
+        city: "",
+        career_goal: "",
+        target_company_type: "",
+        placement_timeline: "",
+        avatar: null,
         created_at: new Date().toISOString(),
         streak: 0,
         interviewsDone: 0,
@@ -150,11 +166,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let found = users.find((u: any) => u.faceId === faceId);
     if (!found) {
       found = {
-        ...DEMO_USER,
         id: "usr_" + Math.random().toString(36).substring(2, 9),
         name: "Face User " + faceId.substring(0, 4),
         email: `face_${faceId}@example.com`,
         faceId: faceId,
+        college: "",
+        branch: "",
+        year: "",
+        city: "",
+        career_goal: "",
+        target_company_type: "",
+        placement_timeline: "",
+        avatar: null,
         created_at: new Date().toISOString(),
         streak: 0,
         interviewsDone: 0,
@@ -169,6 +192,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     insertLoginActivity({ user_name: found.name, user_email: found.email, login_status: 'face_login' });
   };
 
+  const updateUser = (data: Partial<User>) => {
+    if (!user) return;
+    const updated = { ...user, ...data };
+    setUser(updated);
+    localStorage.setItem("prepiq_user", JSON.stringify(updated));
+    // Also update the local users DB
+    const users = getLocalUsers();
+    const idx = users.findIndex((u: any) => u.id === user.id || u.email === user.email);
+    if (idx >= 0) {
+      users[idx] = { ...users[idx], ...data };
+      saveLocalUsers(users);
+    }
+  };
+
   const logout = async () => {
     setUser(null);
     setIsDemo(false);
@@ -177,7 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isDemo, login, loginDemo, signup, logout, googleLoginLocal, faceLoginLocal }}>
+    <AuthContext.Provider value={{ user, isDemo, login, loginDemo, signup, logout, googleLoginLocal, faceLoginLocal, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,113 +1,109 @@
--- ============================================================================
--- PrepIQ: Complete Supabase Migration for ALL Tables
--- ============================================================================
--- Run this in Supabase SQL Editor (Dashboard → SQL Editor → New query)
--- ============================================================================
+-- PrepIQ Migration: Fix tables for localStorage auth
+-- Run this in your Supabase SQL Editor to make all features work live.
+-- This adds missing columns and disables RLS that was blocking writes.
 
--- ── 1. Disable RLS on ALL tables ──
-ALTER TABLE public.interviews DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.login_activity DISABLE ROW LEVEL SECURITY;
+-- 1. Add user_name column to tables that only have user_id
+ALTER TABLE public.sessions ADD COLUMN IF NOT EXISTS user_name TEXT;
+ALTER TABLE public.roadmap_milestones ADD COLUMN IF NOT EXISTS user_name TEXT;
+ALTER TABLE public.chat_history ADD COLUMN IF NOT EXISTS user_name TEXT;
+ALTER TABLE public.certificates ADD COLUMN IF NOT EXISTS user_name TEXT;
+ALTER TABLE public.certificates ADD COLUMN IF NOT EXISTS cert_name TEXT;
+ALTER TABLE public.certificates ADD COLUMN IF NOT EXISTS issuer TEXT;
+ALTER TABLE public.certificates ADD COLUMN IF NOT EXISTS course TEXT;
+ALTER TABLE public.certificates ADD COLUMN IF NOT EXISTS issue_date TEXT;
+ALTER TABLE public.certificates ADD COLUMN IF NOT EXISTS hash_signature TEXT;
+ALTER TABLE public.schedule_slots ADD COLUMN IF NOT EXISTS user_name TEXT;
+ALTER TABLE public.skills ADD COLUMN IF NOT EXISTS user_name TEXT;
+
+-- 2. Create interviews table (was missing from original schema)
+CREATE TABLE IF NOT EXISTS public.interviews (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_name TEXT,
+    role TEXT,
+    score INTEGER,
+    feedback TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 3. Create resume_checks table (was missing from original schema)
+CREATE TABLE IF NOT EXISTS public.resume_checks (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_name TEXT,
+    score INTEGER,
+    status TEXT,
+    feedback TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 4. Fix users table to not require auth.users FK
+-- Drop the old FK constraint if it exists, then alter the default
+DO $$
+BEGIN
+    -- Drop FK constraint on users.id if it exists
+    IF EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'users_id_fkey' 
+        AND table_name = 'users'
+    ) THEN
+        ALTER TABLE public.users DROP CONSTRAINT users_id_fkey;
+    END IF;
+    
+    -- Set default UUID generation if not already
+    ALTER TABLE public.users ALTER COLUMN id SET DEFAULT gen_random_uuid();
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Could not alter users table: %', SQLERRM;
+END $$;
+
+-- 5. Drop FK constraints on other tables that reference users(id)
+DO $$
+BEGIN
+    -- sessions
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'sessions_user_id_fkey') THEN
+        ALTER TABLE public.sessions DROP CONSTRAINT sessions_user_id_fkey;
+    END IF;
+    -- roadmap_milestones
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'roadmap_milestones_user_id_fkey') THEN
+        ALTER TABLE public.roadmap_milestones DROP CONSTRAINT roadmap_milestones_user_id_fkey;
+    END IF;
+    -- chat_history
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'chat_history_user_id_fkey') THEN
+        ALTER TABLE public.chat_history DROP CONSTRAINT chat_history_user_id_fkey;
+    END IF;
+    -- certificates
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'certificates_user_id_fkey') THEN
+        ALTER TABLE public.certificates DROP CONSTRAINT certificates_user_id_fkey;
+    END IF;
+    -- schedule_slots
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'schedule_slots_user_id_fkey') THEN
+        ALTER TABLE public.schedule_slots DROP CONSTRAINT schedule_slots_user_id_fkey;
+    END IF;
+    -- skills
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'skills_user_id_fkey') THEN
+        ALTER TABLE public.skills DROP CONSTRAINT skills_user_id_fkey;
+    END IF;
+    -- login_activity
+    IF EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'login_activity_user_id_fkey') THEN
+        ALTER TABLE public.login_activity DROP CONSTRAINT login_activity_user_id_fkey;
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'FK cleanup: %', SQLERRM;
+END $$;
+
+-- 6. Disable RLS on all tables (required since app uses localStorage auth)
+ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sessions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.interviews DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.roadmap_milestones DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_history DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.certificates DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.roadmap_milestones DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedule_slots DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.skills DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.login_activity DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.resume_checks DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.questions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.internships DISABLE ROW LEVEL SECURITY;
 
--- ── 2. Add user_name to tables that need it ──
-
--- Sessions
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sessions' AND column_name = 'user_name') THEN
-    ALTER TABLE public.sessions ADD COLUMN user_name TEXT;
-  END IF;
-END $$;
-
--- Chat history
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'chat_history' AND column_name = 'user_name') THEN
-    ALTER TABLE public.chat_history ADD COLUMN user_name TEXT;
-  END IF;
-END $$;
-
--- Interviews: feedback column
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'interviews' AND column_name = 'feedback') THEN
-    ALTER TABLE public.interviews ADD COLUMN feedback TEXT;
-  END IF;
-END $$;
-
--- Certificates: extra columns
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'certificates' AND column_name = 'user_name') THEN
-    ALTER TABLE public.certificates ADD COLUMN user_name TEXT;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'certificates' AND column_name = 'cert_name') THEN
-    ALTER TABLE public.certificates ADD COLUMN cert_name TEXT;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'certificates' AND column_name = 'issuer') THEN
-    ALTER TABLE public.certificates ADD COLUMN issuer TEXT;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'certificates' AND column_name = 'course') THEN
-    ALTER TABLE public.certificates ADD COLUMN course TEXT;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'certificates' AND column_name = 'issue_date') THEN
-    ALTER TABLE public.certificates ADD COLUMN issue_date TEXT;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'certificates' AND column_name = 'hash_signature') THEN
-    ALTER TABLE public.certificates ADD COLUMN hash_signature TEXT;
-  END IF;
-END $$;
-
--- Roadmap milestones: user_name
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'roadmap_milestones' AND column_name = 'user_name') THEN
-    ALTER TABLE public.roadmap_milestones ADD COLUMN user_name TEXT;
-  END IF;
-END $$;
-
--- Schedule slots: user_name
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'schedule_slots' AND column_name = 'user_name') THEN
-    ALTER TABLE public.schedule_slots ADD COLUMN user_name TEXT;
-  END IF;
-END $$;
-
--- Skills: user_name
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'skills' AND column_name = 'user_name') THEN
-    ALTER TABLE public.skills ADD COLUMN user_name TEXT;
-  END IF;
-END $$;
-
--- Users: make id NOT require auth.users reference (for localStorage auth)
--- We need to allow inserts without auth.users FK
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'name') THEN
-    ALTER TABLE public.users ADD COLUMN name TEXT;
-  END IF;
-END $$;
-
--- ── 3. Grant access ──
-GRANT ALL ON public.interviews TO anon;
-GRANT ALL ON public.login_activity TO anon;
-GRANT ALL ON public.sessions TO anon;
-GRANT ALL ON public.chat_history TO anon;
-GRANT ALL ON public.certificates TO anon;
-GRANT ALL ON public.roadmap_milestones TO anon;
-GRANT ALL ON public.schedule_slots TO anon;
-GRANT ALL ON public.skills TO anon;
-GRANT ALL ON public.users TO anon;
-GRANT ALL ON public.questions TO anon;
-GRANT ALL ON public.internships TO anon;
-
--- ── 4. Verify ──
-SELECT table_name,
-       (SELECT count(*) FROM information_schema.columns c2 WHERE c2.table_name = t.table_name AND c2.table_schema = 'public') as column_count
-FROM information_schema.tables t
-WHERE table_schema = 'public' 
-  AND table_type = 'BASE TABLE'
-ORDER BY table_name;
+-- Done! All tables are now ready for the PrepIQ app.
+-- The /api/db server route uses the service role key to bypass any remaining policies.

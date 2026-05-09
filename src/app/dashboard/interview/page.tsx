@@ -17,7 +17,6 @@ import { generateAIResponse } from "@/lib/gemini";
 import { useMediaRecorder } from "@/hooks/useMediaRecorder";
 import { uploadRecording, getSignedRecordingUrl } from "@/services/interview-recording";
 import { analyzeInterview, buildTranscript, type InterviewAnalysis } from "@/services/interview-analysis";
-import { supabase } from "@/lib/supabase";
 import InterviewEmailModal from "@/components/InterviewEmailModal";
 import RecordingIndicator from "@/components/RecordingIndicator";
 import InterviewReportSuccess from "@/components/InterviewReportSuccess";
@@ -355,20 +354,24 @@ export default function InterviewPage() {
       // Step 3: Save session to DB (non-blocking)
       setProcessingStep('Saving interview session...');
       try {
-        await supabase.from('interview_sessions').insert([{
-          user_id: userId,
-          full_name: candidateName,
-          email: candidateEmail,
-          domain: config.domain,
-          difficulty: config.difficulty,
-          recording_path: recordingBlob ? `${userId}/${sessionId}.webm` : null,
-          report_json: analysis,
-          overall_score: analysis.overall_score,
-          communication_score: analysis.communication_score,
-          confidence_score: analysis.confidence_score,
-          technical_score: analysis.technical_score,
-          duration_secs: 600 - timer,
-        }]);
+        await fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'insert',
+            table: 'sessions',
+            data: {
+              user_name: candidateName,
+              domain: config.domain,
+              difficulty: config.difficulty,
+              overall_score: analysis.overall_score,
+              communication_score: analysis.communication_score,
+              confidence_score: analysis.confidence_score,
+              ai_feedback: analysis.summary,
+              duration_secs: 600 - timer,
+            },
+          }),
+        });
       } catch (dbErr) {
         console.warn('[PrepIQ] DB save skipped:', dbErr);
       }
@@ -405,10 +408,6 @@ export default function InterviewPage() {
             setEmailActuallySent(false);
           } else {
             setEmailActuallySent(true);
-            // Update session with email sent status (non-blocking)
-            try {
-              await supabase.from('interview_sessions').update({ email_sent: true, email_sent_at: new Date().toISOString() }).eq('full_name', candidateName).eq('email', candidateEmail);
-            } catch {}
             console.log('[PrepIQ] ✅ Report sent to', candidateEmail);
           }
           setReportSent(true);

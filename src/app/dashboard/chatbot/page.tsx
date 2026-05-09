@@ -26,18 +26,19 @@ interface ChatMsg {
   timestamp: string;
 }
 
-const SYSTEM_CONTEXT = `You are "Sage", PrepIQ's AI career coach. You help students prepare for technical and HR interviews.
-The student is John Doe, a 3rd year CS student at XYZ University targeting a Software Engineer role at an MNC.
-Current skills: Python, JavaScript, React, HTML/CSS, Git, SQL, Data Structures.
-Skills to improve: System Design, Docker, AWS, CI/CD, TypeScript, Testing.
-They are in Phase 1 of their roadmap (Foundation) at 60% progress.
+export default function ChatbotPage() {
+  const { user, isDemo } = useAuth();
+  const currentUser = user || null;
+
+  // Build dynamic system context from the actual logged-in user's profile
+  const SYSTEM_CONTEXT = `You are "Sage", PrepIQ's AI career coach. You help students prepare for technical and HR interviews.
+The student is ${currentUser?.name || 'a student'}, ${currentUser?.year ? `a ${currentUser.year}` : ''} ${currentUser?.branch || 'CS'} student${currentUser?.college ? ` at ${currentUser.college}` : ''} targeting a ${currentUser?.career_goal || 'Software Engineer'} role at ${currentUser?.target_company_type === 'FAANG' ? 'a FAANG company' : currentUser?.target_company_type === 'Startup' ? 'a startup' : 'an MNC'}.
+Timeline: ${currentUser?.placement_timeline || '6 months'}.
 Be encouraging, practical, and concise. Use emojis sparingly. Format answers with markdown bold (**text**) for emphasis.
 If asked to give an interview question, give exactly ONE question and explain what a good answer should cover.
 If asked to evaluate an answer, give a score out of 100 and specific actionable feedback.`;
 
-export default function ChatbotPage() {
-  const { user } = useAuth();
-  const [messages, setMessages] = useState<ChatMsg[]>(DEMO_CHAT_HISTORY);
+  const [messages, setMessages] = useState<ChatMsg[]>(isDemo ? DEMO_CHAT_HISTORY : []);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [selectedModel, setSelectedModel] = useState("ChatGPT 5.1 Omni");

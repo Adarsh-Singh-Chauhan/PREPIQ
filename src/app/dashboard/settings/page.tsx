@@ -12,43 +12,59 @@ import { useAuth } from "@/lib/auth-context";
 import { upsertUserProfile, getUserProfile } from "@/lib/supabase-db";
 
 export default function SettingsPage() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth() as any;
   const currentUser = user || DEMO_USER;
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [deleteModal, setDeleteModal] = useState(false);
   const [profile, setProfile] = useState({
-    name: DEMO_USER.name,
-    email: DEMO_USER.email,
-    college: DEMO_USER.college,
-    branch: DEMO_USER.branch,
-    year: DEMO_USER.year,
-    city: DEMO_USER.city,
-    career_goal: DEMO_USER.career_goal,
-    target_company_type: DEMO_USER.target_company_type,
-    placement_timeline: DEMO_USER.placement_timeline,
+    name: currentUser.name || "",
+    email: currentUser.email || "",
+    college: currentUser.college || "",
+    branch: currentUser.branch || "",
+    year: currentUser.year || "",
+    city: currentUser.city || "",
+    career_goal: currentUser.career_goal || "",
+    target_company_type: currentUser.target_company_type || "",
+    placement_timeline: currentUser.placement_timeline || "",
   });
 
   useEffect(() => {
+    // Sync profile state when user changes (e.g. after onboarding)
+    if (user) {
+      setProfile({
+        name: user.name || "",
+        email: user.email || "",
+        college: user.college || "",
+        branch: user.branch || "",
+        year: user.year || "",
+        city: user.city || "",
+        career_goal: user.career_goal || "",
+        target_company_type: user.target_company_type || "",
+        placement_timeline: user.placement_timeline || "",
+      });
+    }
+
+    // Also try to fetch from Supabase for any additional data
     async function loadProfile() {
       if (currentUser?.email) {
         const res = await getUserProfile(currentUser.email);
         if (res.success && res.data) {
-          setProfile({
-            name: res.data.name || currentUser.name,
-            email: res.data.email || currentUser.email,
-            college: res.data.college || "",
-            branch: res.data.branch || "",
-            year: res.data.year || "",
-            city: res.data.city || "",
-            career_goal: res.data.career_goal || "Software Engineer",
-            target_company_type: res.data.target_company_type || "MNC",
-            placement_timeline: res.data.placement_timeline || "6 months",
-          });
+          setProfile(prev => ({
+            name: prev.name || res.data.name || "",
+            email: prev.email || res.data.email || "",
+            college: prev.college || res.data.college || "",
+            branch: prev.branch || res.data.branch || "",
+            year: prev.year || res.data.year || "",
+            city: prev.city || res.data.city || "",
+            career_goal: prev.career_goal || res.data.career_goal || "",
+            target_company_type: prev.target_company_type || res.data.target_company_type || "",
+            placement_timeline: prev.placement_timeline || res.data.placement_timeline || "",
+          }));
         }
       }
     }
     loadProfile();
-  }, [currentUser]);
+  }, [user, currentUser?.email]);
 
   const changeTheme = (t: string) => {
     setTheme(t as any);
@@ -93,6 +109,17 @@ export default function SettingsPage() {
           upsertUserProfile({
             user_name: profile.name,
             email: profile.email,
+            college: profile.college,
+            branch: profile.branch,
+            year: profile.year,
+            city: profile.city,
+            career_goal: profile.career_goal,
+            target_company_type: profile.target_company_type,
+            placement_timeline: profile.placement_timeline,
+          });
+          // Update the auth session so all pages see the new data
+          updateUser({
+            name: profile.name,
             college: profile.college,
             branch: profile.branch,
             year: profile.year,
