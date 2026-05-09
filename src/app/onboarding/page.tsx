@@ -77,6 +77,67 @@ function OnboardingContent() {
       );
     }
 
+    // Generate and save Roadmap
+    const newRoadmap = [
+      {
+        phase: 1,
+        title: "Foundation for " + (form.career_goal || "Software Engineer"),
+        timeframe: "Month 1-2",
+        status: "in_progress",
+        progress: 0,
+        milestones: [
+          { id: "1", text: `Complete core concepts for ${form.career_goal || "Software Engineer"}`, completed: false },
+          { id: "2", text: `Learn required languages & frameworks`, completed: false },
+          { id: "3", text: `Solve 50 Easy problems`, completed: false },
+          { id: "4", text: "Complete 2 mock interviews", completed: false },
+          { id: "5", text: "Build personal portfolio project", completed: false },
+        ]
+      },
+      {
+        phase: 2,
+        title: "Building & Projects",
+        timeframe: "Month 3-4",
+        status: "locked",
+        progress: 0,
+        milestones: [
+          { id: "1", text: "Complete 2 Advanced Projects", completed: false },
+          { id: "2", text: "Solve 100 Medium problems", completed: false },
+          { id: "3", text: "System Design basics", completed: false },
+          { id: "4", text: "Mock interviews (Technical)", completed: false },
+        ]
+      },
+      {
+        phase: 3,
+        title: "Targeting " + (form.company_type || "MNC"),
+        timeframe: "Month 5-6",
+        status: "locked",
+        progress: 0,
+        milestones: [
+          { id: "1", text: `Apply to 50 ${form.company_type || "MNC"} openings`, completed: false },
+          { id: "2", text: "Advanced System Design", completed: false },
+          { id: "3", text: "Solve Hard problems", completed: false },
+          { id: "4", text: "Final prep mock interviews", completed: false },
+        ]
+      }
+    ];
+
+    if (user?.id) {
+      localStorage.setItem(`roadmap_${user.id}`, JSON.stringify(newRoadmap));
+      
+      import('@/lib/supabase-db').then(({ insertRoadmapMilestone }) => {
+        newRoadmap.forEach(phase => {
+          phase.milestones.forEach(m => {
+            insertRoadmapMilestone({
+              user_name: userName,
+              phase_number: phase.phase,
+              milestone_text: m.text,
+              is_completed: m.completed,
+            });
+          });
+        });
+      });
+    }
+
     toast.success("Profile complete! Generating your roadmap...");
     setTimeout(() => router.push("/dashboard"), 1500);
   };

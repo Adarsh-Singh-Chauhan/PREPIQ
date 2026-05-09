@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: 'PrepIQ <onboarding@resend.dev>',
+        from: 'onboarding@resend.dev',
         to: [email],
         subject: 'Your PrepIQ Interview Analysis Report',
         html: emailHtml,

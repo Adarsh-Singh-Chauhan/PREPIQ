@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
-  Mic, Target, Flame, TrendingUp, ArrowRight,
+  Mic, Target, Flame, TrendingUp, TrendingDown, ArrowRight,
   Sparkles, Loader2
 } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";

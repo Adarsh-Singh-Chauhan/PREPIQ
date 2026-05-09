@@ -466,6 +466,25 @@ export async function upsertUserProfile(data: UserProfileInsert) {
   }
 }
 
+export async function getUserProfile(email: string) {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    if (error) {
+      console.error('[Supabase] User profile fetch error:', error.message);
+      return { success: false, error: error.message };
+    }
+    return { success: true, data };
+  } catch (err: any) {
+    console.error('[Supabase] User profile fetch exception:', err);
+    return { success: false, error: err.message };
+  }
+}
+
 // ─── Browser Detection Helpers ────────────────────────────────
 
 function detectBrowser(): string {

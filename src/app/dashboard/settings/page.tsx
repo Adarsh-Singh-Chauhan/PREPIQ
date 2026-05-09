@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Settings, User, Target, Camera, Bell, Palette, Trash2, Save,
@@ -9,7 +9,7 @@ import {
 import { DEMO_USER } from "@/lib/demo-data";
 import toast from "react-hot-toast";
 import { useAuth } from "@/lib/auth-context";
-import { upsertUserProfile } from "@/lib/supabase-db";
+import { upsertUserProfile, getUserProfile } from "@/lib/supabase-db";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -27,6 +27,28 @@ export default function SettingsPage() {
     target_company_type: DEMO_USER.target_company_type,
     placement_timeline: DEMO_USER.placement_timeline,
   });
+
+  useEffect(() => {
+    async function loadProfile() {
+      if (currentUser?.email) {
+        const res = await getUserProfile(currentUser.email);
+        if (res.success && res.data) {
+          setProfile({
+            name: res.data.name || currentUser.name,
+            email: res.data.email || currentUser.email,
+            college: res.data.college || "",
+            branch: res.data.branch || "",
+            year: res.data.year || "",
+            city: res.data.city || "",
+            career_goal: res.data.career_goal || "Software Engineer",
+            target_company_type: res.data.target_company_type || "MNC",
+            placement_timeline: res.data.placement_timeline || "6 months",
+          });
+        }
+      }
+    }
+    loadProfile();
+  }, [currentUser]);
 
   const changeTheme = (t: string) => {
     setTheme(t as any);
