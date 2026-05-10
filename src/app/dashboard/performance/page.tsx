@@ -30,12 +30,12 @@ export default function PerformancePage() {
       const res = await getSessions(user.name);
       if (res.success && res.data.length > 0) {
         // Map Supabase columns to expected properties
-        const mappedSessions = res.data.map(d => ({
+        const mappedSessions = res.data.map((d: Record<string, any>) => ({
           date: d.created_at,
           overall_score: d.overall_score || 0,
           topic: d.domain,
           domain: d.domain
-        })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        })).sort((a: { date: string; overall_score: number }, b: { date: string; overall_score: number }) => new Date(a.date).getTime() - new Date(b.date).getTime());
         setSessions(mappedSessions);
       } else {
         setSessions([]); // No data

@@ -35,10 +35,10 @@ export default function DashboardHome() {
       ]);
 
       if (sessionsRes.success && sessionsRes.data) {
-        const mappedSessions = sessionsRes.data.map(d => ({
+        const mappedSessions = sessionsRes.data.map((d: Record<string, any>) => ({
           date: d.created_at,
           overall_score: d.overall_score || 0,
-        })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        })).sort((a: { date: string; overall_score: number }, b: { date: string; overall_score: number }) => new Date(a.date).getTime() - new Date(b.date).getTime());
         setSessions(mappedSessions);
       } else {
         setSessions([]);
