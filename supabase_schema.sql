@@ -159,6 +159,26 @@ CREATE TABLE IF NOT EXISTS public.skills (
 -- IMPORTANT: For the app to work, you must either:
 -- 1. DISABLE RLS on all tables (easiest for development/hackathon):
 
+-- First, drop any existing RLS policies to make this script idempotent
+DO $$
+DECLARE
+    pol RECORD;
+BEGIN
+    FOR pol IN
+        SELECT schemaname, tablename, policyname
+        FROM pg_policies
+        WHERE schemaname = 'public'
+          AND tablename IN (
+              'users', 'sessions', 'interviews', 'roadmap_milestones',
+              'chat_history', 'certificates', 'schedule_slots', 'skills',
+              'login_activity', 'resume_checks', 'questions', 'internships',
+              'interview_sessions'
+          )
+    LOOP
+        EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', pol.policyname, pol.schemaname, pol.tablename);
+    END LOOP;
+END $$;
+
 ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sessions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interviews DISABLE ROW LEVEL SECURITY;
